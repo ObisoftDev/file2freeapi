@@ -143,4 +143,5 @@ def config(app):
             if state:
                 result['state'] = 'OK'
                 result['data'] = state
+            States.pop(token)
         return jsonify(result)
