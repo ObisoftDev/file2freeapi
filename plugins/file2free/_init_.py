@@ -58,6 +58,8 @@ def process(*args):
             file = downloader.download_url(url, progressfunc=progress,args=(token))
             if not downloader.stoping:
                 if file:
+                    filesize = utils.get_file_size(file)
+                    progress(downloader,file,filesize,filesize,0,0,token)
                     States[token]['state'] = 2
                     #upload
                     mcli = moodle_client.MoodleClient(host,authname,passw,repoid,Proxy=proxy)
