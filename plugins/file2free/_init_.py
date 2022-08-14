@@ -15,6 +15,7 @@ from . import ProxyCloud as pxcl
 #states
 States = {}
 def check_access(auth,max=3):
+    global STATE
     counter = 0
     for item in States:
         if States[item]['auth'] == auth:
@@ -28,6 +29,7 @@ def get_state(token):
 #end states
 
 def progress(dl,file,current,total,speed,time,token):
+    global STATE
     if token:
         States[token]['state'] = 1
         States[token]['file'] = file
@@ -39,6 +41,7 @@ def progress(dl,file,current,total,speed,time,token):
 
 
 def process(*args):
+    global STATE
     urls = args[0]
     token = args[1]
     host = args[2]
@@ -91,6 +94,7 @@ def config(app):
 
     @app.route('/file2free/create')
     def create():
+        global STATE
         jsondata = None
         try:
             jsondata = request.json
@@ -131,6 +135,7 @@ def config(app):
 
     @app.route('/file2free/state')
     def state():
+        global STATE
         jsondata = None
         try:
             jsondata = request.json
@@ -149,6 +154,7 @@ def config(app):
 
     @app.route('/file2free/parse')
     def parse():
+        global STATE
         jsondata = None
         try:
             jsondata = request.json
