@@ -73,7 +73,7 @@ def createID(count=8):
 def makeSafeFilename(inputFilename):
     # Set here the valid chars
     ret = ''
-    map = '0123456789abcd3fghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.'
+    map = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.'
     for char in inputFilename:
         if char in map:
            ret += char

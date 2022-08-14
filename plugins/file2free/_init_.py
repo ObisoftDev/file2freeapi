@@ -143,5 +143,44 @@ def config(app):
             if state:
                 result['state'] = 'OK'
                 result['data'] = state
-            States.pop(token)
+        return jsonify(result)
+
+    @app.route('/file2free/parse')
+    def parse():
+        jsondata = None
+        try:
+            jsondata = request.json
+        except:
+            pass
+        result = {'state': "ERROR PARSING"}
+        if jsondata:
+            type = None
+            host = None
+            authname = None
+            authpassw = None
+            urls = None
+            if 'host' in jsondata:
+                host = jsondata['host']
+            if 'auth' in jsondata:
+                authname = jsondata['auth']
+            if 'clave' in jsondata:
+                authpassw = jsondata['clave']
+            if 'urls' in jsondata:
+                urls = jsondata['urls']
+            if 'type' in jsondata:
+                type = jsondata['type']
+            proxy = None
+            try:
+                proxy = pxcl.parse(os.environ.get('env_proxy'))
+                # proxy = pxcl.ProxyCloud('181.225.255.129',8080)
+            except:
+                pass
+            if host and authname and authpassw and urls:
+                if type=='calendar':
+                    parser = d2c.Draft2Calendar()
+                    asyncio.run(parser.send_calendar(host, authname, authpassw, urls, proxy=proxy))
+                    while parser.status == 0: pass
+                    if parser.data:
+                        result['state'] = 'OK'
+                        result['data'] = parser.data
         return jsonify(result)
