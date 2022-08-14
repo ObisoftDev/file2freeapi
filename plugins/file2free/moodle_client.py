@@ -168,7 +168,7 @@ class MoodleClient:
             if ret:
                 data = await self.UploadDraft(path,progress_callback,args)
                 self.status = STATUS_LOGED
-            self.LogOut()
+            await self.LogOut()
             return ret
 
     ##############################################################################
