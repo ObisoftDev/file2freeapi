@@ -228,4 +228,6 @@ def config(app):
                     if parser.data:
                         result['state'] = 'OK'
                         result['data'] = parser.data
+                else:
+                    result['state'] = 'No Existe El Parse En La Api'
         return jsonify(result)
