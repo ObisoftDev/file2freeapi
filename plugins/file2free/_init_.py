@@ -23,6 +23,7 @@ def check_access(auth,max=3):
     if counter>=max:return False
     return True
 def get_state(token):
+    global States
     if token in States:
         return States[token]
     return None
