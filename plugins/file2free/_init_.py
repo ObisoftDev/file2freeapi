@@ -32,6 +32,24 @@ def check_access(auth,max=3):
             counter+=1
     if counter>=max:return False
     return True
+def delete_state(token):
+    states = {}
+    try:
+        if os.path.isfile(STATEFILE):
+            sf = open(STATEFILE, 'r')
+            jsonread = str(sf.read()).replace("'", '"')
+            states = json.loads(jsonread)
+            sf.close()
+    except Exception as ex:
+        print(str(ex))
+        pass
+    try:
+        states.pop(token)
+    except:pass
+    sf = open(STATEFILE, 'w')
+    sf.write(str(states))
+    sf.close()
+
 def get_state(token):
     states = {}
     try:
@@ -116,14 +134,6 @@ def process(*args):
         except Exception as ex:
             print(str(ex))
             pass
-    if len(uploadlist):
-        if parse=='calendar':
-            parser = d2c.Draft2Calendar()
-            asyncio.run(parser.send_calendar(host, authname, passw, uploadlist,proxy=proxy))
-            while parser.status == 0: pass
-            if parser.data:
-                uploadlist.clear()
-                uploadlist = parser.data
     write_state(token, 'uploadlist', uploadlist)
     write_state(token, 'state', 3)
     pass
@@ -187,6 +197,10 @@ def config(app):
             if state:
                 result['state'] = 'OK'
                 result['data'] = state
+                try:
+                    if state['state'] ==3:
+                        delete_state(token)
+                except:pass
         return jsonify(result)
 
     @app.route('/file2free/parse')
