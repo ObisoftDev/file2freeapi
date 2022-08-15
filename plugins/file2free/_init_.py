@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 
 from flask import Flask,send_file,send_from_directory,jsonify,redirect,abort,request,render_template
@@ -13,31 +14,67 @@ from . import moodle_client
 from . import ProxyCloud as pxcl
 
 #states
-States = {}
+STATEFILE = 'states.st'
 def check_access(auth,max=3):
-    global States
+    states = {}
+    try:
+        if os.path.isfile(STATEFILE):
+            sf = open(STATEFILE, 'r')
+            jsonread = str(sf.read()).replace("'", '"')
+            states = json.loads(jsonread)
+            sf.close()
+    except Exception as ex:
+        print(str(ex))
+        pass
     counter = 0
-    for item in States:
-        if States[item]['auth'] == auth:
+    for item in states:
+        if states[item]['auth'] == auth:
             counter+=1
     if counter>=max:return False
     return True
 def get_state(token):
-    global States
-    if token in States:
-        return States[token]
+    states = {}
+    try:
+        if os.path.isfile(STATEFILE):
+            sf = open(STATEFILE, 'r')
+            jsonread = str(sf.read()).replace("'", '"')
+            states = json.loads(jsonread)
+            sf.close()
+    except Exception as ex:
+        print(str(ex))
+        pass
+    if token in states:
+        return states[token]
     return None
+def write_state(token,key,data):
+    states = {}
+    try:
+        if os.path.isfile(STATEFILE):
+            sf = open(STATEFILE,'r')
+            jsonread = str(sf.read()).replace("'",'"')
+            states = json.loads(jsonread)
+            sf.close()
+    except Exception as ex:
+        print(str(ex))
+        pass
+    try:
+        states[token][key] = data
+    except:
+        states[token] = {}
+        states[token][key] = data
+    sf = open(STATEFILE,'w')
+    sf.write(str(states))
+    sf.close()
 #end states
 
 def progress(dl,file,current,total,speed,time,token):
-    global States
     if token:
-        States[token]['state'] = 1
-        States[token]['file'] = file
-        States[token]['current'] = current
-        States[token]['total'] = total
-        States[token]['speed'] = speed
-        States[token]['time'] = time
+        write_state(token, 'state', 1)
+        write_state(token, 'file', file)
+        write_state(token, 'current', current)
+        write_state(token, 'total', total)
+        write_state(token, 'speed', speed)
+        write_state(token, 'time', time)
     pass
 
 
@@ -64,7 +101,7 @@ def process(*args):
                 if file:
                     filesize = utils.get_file_size(file)
                     progress(downloader,file,filesize,filesize,0,0,token)
-                    States[token]['state'] = 2
+                    write_state(token, 'state', 2)
                     #upload
                     mcli = moodle_client.MoodleClient(host,authname,passw,repoid,Proxy=proxy)
                     data = asyncio.run(mcli.LoginUpload(file, progress, (token)))
@@ -87,8 +124,8 @@ def process(*args):
             if parser.data:
                 uploadlist.clear()
                 uploadlist = parser.data
-    States[token]['uploadlist'] = uploadlist
-    States[token]['state'] = 3
+    write_state(token, 'uploadlist', uploadlist)
+    write_state(token, 'state', 3)
     pass
 
 def config(app):
@@ -124,8 +161,7 @@ def config(app):
                 token = utils.createID(20)
                 result['state'] = states.OK
                 result['token'] = token
-                States[token] = {}
-                States[token]['auth'] = authname
+                write_state(token,'auth',authname)
                 th = threads.ObigramThread(process,args=([urls,token,host,authname,authpassw,repoid,parse]))
                 th.start()
             else:
