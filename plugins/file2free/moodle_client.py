@@ -84,6 +84,8 @@ class MoodleClient:
         self.sesskey = None
         self.query = None
         self.client_id = None
+        self.loged = False
+        self.cookie = None
 
     def get_store(self,name):
         if name in self.store:
@@ -113,100 +115,127 @@ class MoodleClient:
                 )
         self.__Session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True),connector=connector)
 
+    async def __construct_cookie(self):
+        try:
+            connector = aiohttp.TCPConnector(ssl=False)
+            if self.proxy:
+                connector = ProxyConnector(
+                     proxy_type=ProxyType.SOCKS5,
+                     host=self.proxy.ip,
+                     port=self.proxy.port,
+                     rdns=True,
+                     ssl=False
+                )
+        except:
+            connector = aiohttp.TCPConnector(ssl=False)
+            if self.proxy:
+                connector = ProxyConnector(
+                    proxy_type=ProxyType.SOCKS5,
+                    host=self.proxy.ip,
+                    port=self.proxy.port,
+                    rdns=True,
+                    ssl=False
+                )
+        self.__Session = aiohttp.ClientSession(cookie_jar=self.cookie,connector=connector)
+
     async def LogOut(self) -> None:
         await self.__Session.close()
 
     ##############################################################################
-    async def LoginUpload(self,path: str, progress_callback: Callable = None,args=None) -> bool:
-            await self.__construct()
+    async def LoginUpload(self,path: str, progress_callback: Callable = None,args=None,close=False) -> bool:
+            if self.loged == False:
+                await self.__construct()
             # Intentar iniciar sesión
-            try:
-
-                # Extraer el token de inicio de sesión
-                timeout = aiohttp.ClientTimeout(total=20)
-                async with self.__Session.get(
-                    url=self.ServerUrl + "/login/index.php",
-                    headers=self.__Headers,
-                    timeout=timeout,
-                ) as response:
-                    html = await response.text()
-
-                # Preparar payload de inicio de sesión
                 try:
-                    # Caso para veriones modernas de Moodle
-                    soup = BeautifulSoup(html, "html.parser")
-                    token = soup.find("input", attrs={"name": "logintoken"})["value"]
-                    anchor = None
-                    rememberusername = None
+
+                    # Extraer el token de inicio de sesión
+                    timeout = aiohttp.ClientTimeout(total=20)
+                    async with self.__Session.get(
+                        url=self.ServerUrl + "/login/index.php",
+                        headers=self.__Headers,
+                        timeout=timeout,
+                    ) as response:
+                        html = await response.text()
+
+                    # Preparar payload de inicio de sesión
                     try:
-                        anchor = soup.find("input", attrs={"name": "anchor"})["value"]
-                    except:pass
-                    try:
-                        rememberusername = soup.find("input", attrs={"name": "rememberusername"})["value"]
-                    except:pass
-                    payload = {
-                        "logintoken": token,
-                        "username": self.UserName,
-                        "password": self.Password
-                    }
-                    if anchor != None:
-                        payload['anchor'] = anchor
-                    if rememberusername:
-                        payload['rememberusername'] = rememberusername
-                except:
-                    # Caso para la versión obsoleta de Aulavirtual de SLD
-                    soup = BeautifulSoup(html, "html.parser")
-                    anchor = None
-                    rememberusername = None
-                    try:
-                        anchor = soup.find("input", attrs={"name": "anchor"})["value"]
+                        # Caso para veriones modernas de Moodle
+                        soup = BeautifulSoup(html, "html.parser")
+                        token = soup.find("input", attrs={"name": "logintoken"})["value"]
+                        anchor = None
+                        rememberusername = None
+                        try:
+                            anchor = soup.find("input", attrs={"name": "anchor"})["value"]
+                        except:pass
+                        try:
+                            rememberusername = soup.find("input", attrs={"name": "rememberusername"})["value"]
+                        except:pass
+                        payload = {
+                            "logintoken": token,
+                            "username": self.UserName,
+                            "password": self.Password
+                        }
+                        if anchor != None:
+                            payload['anchor'] = anchor
+                        if rememberusername:
+                            payload['rememberusername'] = rememberusername
                     except:
-                        pass
-                    try:
-                        rememberusername = soup.find("input", attrs={"name": "rememberusername"})["value"]
-                    except:pass
-                    payload = {
-                        "username": self.UserName,
-                        "password": self.Password
-                    }
-                    if anchor != None:
-                        payload['anchor'] = anchor
-                    if rememberusername:
-                        payload['rememberusername'] = rememberusername
+                        # Caso para la versión obsoleta de Aulavirtual de SLD
+                        soup = BeautifulSoup(html, "html.parser")
+                        anchor = None
+                        rememberusername = None
+                        try:
+                            anchor = soup.find("input", attrs={"name": "anchor"})["value"]
+                        except:
+                            pass
+                        try:
+                            rememberusername = soup.find("input", attrs={"name": "rememberusername"})["value"]
+                        except:pass
+                        payload = {
+                            "username": self.UserName,
+                            "password": self.Password
+                        }
+                        if anchor != None:
+                            payload['anchor'] = anchor
+                        if rememberusername:
+                            payload['rememberusername'] = rememberusername
 
-                # Iniciar sesión
-                async with self.__Session.post(
-                    url=self.ServerUrl + "/login/index.php",
-                    headers=self.__Headers,
-                    data=payload,
-                    timeout=timeout,
-                ) as response:
-                    await response.text()
+                    # Iniciar sesión
+                    async with self.__Session.post(
+                        url=self.ServerUrl + "/login/index.php",
+                        headers=self.__Headers,
+                        data=payload,
+                        timeout=timeout,
+                    ) as response:
+                        await response.text()
 
-                # Comprobar si no redireccionó desde /login/index.php
-                if str(response.url).lower() == (self.ServerUrl + "/login/index.php").lower():
-                    # Error, datos incorrectos
+                    # Comprobar si no redireccionó desde /login/index.php
+                    if str(response.url).lower() == (self.ServerUrl + "/login/index.php").lower():
+                        # Error, datos incorrectos
+                        ret = False
+                        self.status = STATUS_NOTLOGED
+                    else:
+                        # Sesión iniciada
+                        self.loged = True
+                        self.cookie = self.__Session.cookie_jar
+                        # print(self.__Session.cookie_jar.filter_cookies(URL(self.ServerUrl)))
+
+                except Exception as ex:
+                    self.store[path] = {'error':str(ex)}
+                    # Error desconocido (mayormente conexión)
                     ret = False
                     self.status = STATUS_NOTLOGED
-                else:
-                    # Sesión iniciada
-                    ret = True
-                    # print(self.__Session.cookie_jar.filter_cookies(URL(self.ServerUrl)))
 
-            except Exception as ex:
-                self.store[path] = {'error':str(ex)}
-                # Error desconocido (mayormente conexión)
-                ret = False
-                self.status = STATUS_NOTLOGED
-
-            self.__LoginLOCK = False
-            if ret:
+                self.__LoginLOCK = False
+            else:
+                await self.__construct_cookie()
+            if self.loged:
                 data = await self.UploadDraft(path,progress_callback,args)
                 self.status = STATUS_LOGED
             try:
                 await self.LogOut()
             except:pass
-            return ret
+            return self.loged
 
     ##############################################################################
     async def UploadDraft(self, path: str, progress_callback: Callable = None,args=None) -> dict:
@@ -333,9 +362,14 @@ class MoodleClient:
             return {"error": "Error. Error desconocido."}
 
 
-#file = 'requirements.txt'
-#mcli = MoodleClient('https://moodle.uclv.edu.cu/','Cjmartinez','helencita25*','4')
-##data = asyncio.run(mcli.LoginUpload(file))
-#while mcli.status is None: pass
-#data = mcli.get_store(file)
-#print(data)
+file = 'requirements.txt'
+mcli = MoodleClient('https://moodle.uclv.edu.cu/','Cjmartinez','helencita25*','4')
+data = asyncio.run(mcli.LoginUpload(file))
+while mcli.status is None: pass
+data = mcli.get_store(file)
+print(data)
+file = 'states.st'
+data = asyncio.run(mcli.LoginUpload(file))
+while mcli.status is None: pass
+data = mcli.get_store(file)
+print(data)
