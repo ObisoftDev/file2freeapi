@@ -135,7 +135,7 @@ def process(*args):
                     else:
                         mcli = moodle_client.MoodleClient(host,authname,passw,repoid,Proxy=proxy)
                         files = []
-                        if filesize>=zips:
+                        if filesize>=zips*1024*1024:
                             mult_file = zipfile.MultiFile(file,1024*1024*zips)
                             zip = zipfile.ZipFile(mult_file,  mode='w', compression=zipfile.ZIP_DEFLATED)
                             zip.write(file)
