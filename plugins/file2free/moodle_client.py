@@ -76,11 +76,14 @@ class MoodleClient:
 
         # Atributos privados
         self.__Session = None
-        self.eventloop = None
         self.__Headers: dict = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.72 Safari/537.36"
         }
         self.__LoginLOCK: bool = False
+        #SAVE VARIABLES
+        self.sesskey = None
+        self.query = None
+        self.client_id = None
 
     def get_store(self,name):
         if name in self.store:
@@ -88,16 +91,26 @@ class MoodleClient:
         return None
 
     async def __construct(self):
-        self.eventloop = asyncio.get_event_loop()
-        connector = aiohttp.TCPConnector(verify_ssl=False)
-        if self.proxy:
-            connector = ProxyConnector(
-                 proxy_type=ProxyType.SOCKS5,
-                 host=self.proxy.ip,
-                 port=self.proxy.port,
-                 rdns=True,
-                 verify_ssl=False
-            )
+        try:
+            connector = aiohttp.TCPConnector(ssl=False)
+            if self.proxy:
+                connector = ProxyConnector(
+                     proxy_type=ProxyType.SOCKS5,
+                     host=self.proxy.ip,
+                     port=self.proxy.port,
+                     rdns=True,
+                     ssl=False
+                )
+        except:
+            connector = aiohttp.TCPConnector(ssl=False)
+            if self.proxy:
+                connector = ProxyConnector(
+                    proxy_type=ProxyType.SOCKS5,
+                    host=self.proxy.ip,
+                    port=self.proxy.port,
+                    rdns=True,
+                    ssl=False
+                )
         self.__Session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True),connector=connector)
 
     async def LogOut(self) -> None:
@@ -190,7 +203,9 @@ class MoodleClient:
             if ret:
                 data = await self.UploadDraft(path,progress_callback,args)
                 self.status = STATUS_LOGED
-            self.LogOut()
+            try:
+                await self.LogOut()
+            except:pass
             return ret
 
     ##############################################################################
@@ -204,21 +219,28 @@ class MoodleClient:
 
         try:
             # Obtener parámetros
-            timeout = aiohttp.ClientTimeout(total=20)
-            async with self.__Session.get(
-                url=self.ServerUrl + "/user/edit.php",  # Porque algunos bloquean el files.php
-                headers=self.__Headers,
-                timeout=timeout,
-            ) as response:
-                resp_1 = await response.text()
+            if self.sesskey and self.query and self.client_id:
+                pass
+            else:
+                timeout = aiohttp.ClientTimeout(total=20)
+                async with self.__Session.get(
+                        url=self.ServerUrl + "/user/edit.php",  # Porque algunos bloquean el files.php
+                        headers=self.__Headers,
+                        timeout=timeout,
+                ) as response:
+                    resp_1 = await response.text()
 
-            soup = BeautifulSoup(resp_1, "html.parser")
-            sesskey = soup.find("input", attrs={"name": "sesskey"})["value"]
-            query = URL(soup.find("object", attrs={"type": "text/html"})["data"]).query
+                soup = BeautifulSoup(resp_1, "html.parser")
+                self.sesskey = soup.find("input", attrs={"name": "sesskey"})["value"]
+                self.query = URL(soup.find("object", attrs={"type": "text/html"})["data"]).query
 
-            client_id_pattern = '"client_id":"\w{13}"'
-            client_id = re.findall(client_id_pattern, resp_1)
-            client_id = re.findall("\w{13}", client_id[0])[0]
+                client_id_pattern = '"client_id":"\w{13}"'
+                client_id = re.findall(client_id_pattern, resp_1)
+                self.client_id = re.findall("\w{13}", client_id[0])[0]
+            if self.sesskey and self.query and self.client_id:
+                sesskey = self.sesskey
+                query = self.query
+                client_id = self.client_id
             itemid = query["itemid"]
             file = MProgressFile(filename=path, read_callback=progress_callback,args=args)
             # Crear payloads POST
@@ -257,8 +279,10 @@ class MoodleClient:
         except Exception as ex:
             resp = {"error": str(ex) }
 
+        try:
+            file.close()
+        except:pass
         self.TasksInProgress -= 1
-        file.close()
         self.status = STATUS_FINISHUPLOAD
         self.store[path] = resp
         return resp
@@ -310,8 +334,8 @@ class MoodleClient:
 
 
 #file = 'requirements.txt'
-#mcli = MoodleClient('https://moodle.cujae.edu.cu/','fialejandrodesp','Adre2909','5')
-#data = asyncio.run(mcli.LoginUpload(file))
+#mcli = MoodleClient('https://moodle.uclv.edu.cu/','Cjmartinez','helencita25*','4')
+##data = asyncio.run(mcli.LoginUpload(file))
 #while mcli.status is None: pass
 #data = mcli.get_store(file)
 #print(data)
