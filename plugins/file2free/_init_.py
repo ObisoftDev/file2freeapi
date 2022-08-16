@@ -12,6 +12,7 @@ from . import downloader as dl
 from . import draft_to_calendar as d2c
 from . import moodle_client
 from . import ProxyCloud as pxcl
+from . import zipfile
 
 #states
 STATEFILE = 'states.st'
@@ -85,7 +86,7 @@ def write_state(token,key,data):
     sf.close()
 #end states
 
-def progress(dl,file,current,total,speed,time,token):
+def progress_down(dl,file,current,total,speed,time,token):
     if token:
         write_state(token, 'state', 1)
         write_state(token, 'file', file)
@@ -94,10 +95,17 @@ def progress(dl,file,current,total,speed,time,token):
         write_state(token, 'speed', speed)
         write_state(token, 'time', time)
     pass
-
+def progress_upt(dl,file,current,total,speed,time,token):
+    if token:
+        write_state(token, 'state', 2)
+        write_state(token, 'file', file)
+        write_state(token, 'current', current)
+        write_state(token, 'total', total)
+        write_state(token, 'speed', speed)
+        write_state(token, 'time', time)
+    pass
 
 def process(*args):
-    global States
     urls = args[0]
     token = args[1]
     host = args[2]
@@ -105,6 +113,7 @@ def process(*args):
     passw = args[4]
     repoid = args[5]
     parse = args[6]
+    zips = args[7]
     downloader = dl.Downloader()
     uploadlist = []
     proxy = None
@@ -114,23 +123,37 @@ def process(*args):
     except:pass
     for url in urls:
         try:
-            file = downloader.download_url(url, progressfunc=progress,args=(token))
+            file = downloader.download_url(url, progressfunc=progress_down,args=(token))
             if not downloader.stoping:
                 if file:
                     filesize = utils.get_file_size(file)
-                    progress(downloader,file,filesize,filesize,0,0,token)
+                    progress_upt(downloader,file,0,filesize,0,0,token)
                     write_state(token, 'state', 2)
                     #upload
-                    mcli = moodle_client.MoodleClient(host,authname,passw,repoid,Proxy=proxy)
-                    data = asyncio.run(mcli.LoginUpload(file, progress, (token)))
-                    while mcli.status is None: pass
-                    data = mcli.get_store(file)
-                    if data:
-                        if 'error' in data:
-                            err = data['error']
+                    if 'nube' in host or 'icloud' in host:
+                        pass
+                    else:
+                        mcli = moodle_client.MoodleClient(host,authname,passw,repoid,Proxy=proxy)
+                        files = []
+                        if filesize>=zips:
+                            mult_file = zipfile.MultiFile(file,1024*1024*zips)
+                            zip = zipfile.ZipFile(mult_file,  mode='w', compression=zipfile.ZIP_DEFLATED)
+                            zip.write(file)
+                            zip.close()
+                            mult_file.close()
+                            files = mult_file.files
                         else:
-                            uploadlist.append({'file': file, 'url': data['url']})
-                    os.unlink(file)
+                            files.append(file)
+                        for f in files:
+                            data = asyncio.run(mcli.LoginUpload(f, progress_upt, (token)))
+                            while mcli.status is None: pass
+                            data = mcli.get_store(f)
+                            if data:
+                                if 'error' in data:
+                                    err = data['error']
+                                else:
+                                    uploadlist.append({'file': f, 'url': data['url']})
+                            os.unlink(f)
         except Exception as ex:
             print(str(ex))
             pass
@@ -153,6 +176,7 @@ def config(app):
             authpassw = 'auth'
             host = ''
             repoid = '4'
+            zips = 100
             parse = ''
             urls = None
             if 'auth' in jsondata:
@@ -167,12 +191,14 @@ def config(app):
                 urls =jsondata['urls']
             if 'parse' in jsondata:
                 parse =jsondata['parse']
+            if 'zips' in jsondata:
+                zips =jsondata['zips']
             if auth.auth(authname) and urls and check_access(authname):
                 token = utils.createID(20)
                 result['state'] = states.OK
                 result['token'] = token
                 write_state(token,'auth',authname)
-                th = threads.ObigramThread(process,args=([urls,token,host,authname,authpassw,repoid,parse]))
+                th = threads.ObigramThread(process,args=([urls,token,host,authname,authpassw,repoid,parse,zips]))
                 th.start()
             else:
                 result['state'] = states.ERROR_NOT_AUTH
