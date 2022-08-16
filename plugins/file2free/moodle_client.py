@@ -362,14 +362,14 @@ class MoodleClient:
             return {"error": "Error. Error desconocido."}
 
 
-file = 'requirements.txt'
-mcli = MoodleClient('https://moodle.uclv.edu.cu/','Cjmartinez','helencita25*','4')
-data = asyncio.run(mcli.LoginUpload(file))
-while mcli.status is None: pass
-data = mcli.get_store(file)
-print(data)
-file = 'states.st'
-data = asyncio.run(mcli.LoginUpload(file))
-while mcli.status is None: pass
-data = mcli.get_store(file)
-print(data)
+#file = 'requirements.txt'
+#mcli = MoodleClient('https://moodle.uclv.edu.cu/','Cjmartinez','helencita25*','4')
+#data = asyncio.run(mcli.LoginUpload(file))
+#while mcli.status is None: pass
+#data = mcli.get_store(file)
+#print(data)
+#file = 'states.st'
+#data = asyncio.run(mcli.LoginUpload(file))
+#while mcli.status is None: pass
+#data = mcli.get_store(file)
+#print(data)
