@@ -123,21 +123,43 @@ class MoodleClient:
                     # Caso para veriones modernas de Moodle
                     soup = BeautifulSoup(html, "html.parser")
                     token = soup.find("input", attrs={"name": "logintoken"})["value"]
+                    anchor = None
+                    rememberusername = None
+                    try:
+                        anchor = soup.find("input", attrs={"name": "anchor"})["value"]
+                    except:pass
+                    try:
+                        rememberusername = soup.find("input", attrs={"name": "rememberusername"})["value"]
+                    except:pass
                     payload = {
-                        "anchor": "",
                         "logintoken": token,
                         "username": self.UserName,
-                        "password": self.Password,
-                        "rememberusername": 1,
+                        "password": self.Password
                     }
+                    if anchor != None:
+                        payload['anchor'] = anchor
+                    if rememberusername:
+                        payload['rememberusername'] = rememberusername
                 except:
                     # Caso para la versión obsoleta de Aulavirtual de SLD
+                    soup = BeautifulSoup(html, "html.parser")
+                    anchor = None
+                    rememberusername = None
+                    try:
+                        anchor = soup.find("input", attrs={"name": "anchor"})["value"]
+                    except:
+                        pass
+                    try:
+                        rememberusername = soup.find("input", attrs={"name": "rememberusername"})["value"]
+                    except:pass
                     payload = {
-                        "anchor": "",
                         "username": self.UserName,
-                        "password": self.Password,
-                        "rememberusername": 1,
+                        "password": self.Password
                     }
+                    if anchor != None:
+                        payload['anchor'] = anchor
+                    if rememberusername:
+                        payload['rememberusername'] = rememberusername
 
                 # Iniciar sesión
                 async with self.__Session.post(
@@ -168,7 +190,7 @@ class MoodleClient:
             if ret:
                 data = await self.UploadDraft(path,progress_callback,args)
                 self.status = STATUS_LOGED
-            await self.LogOut()
+            self.LogOut()
             return ret
 
     ##############################################################################
@@ -285,3 +307,11 @@ class MoodleClient:
         except:
             self.status = STATUS_FINISHDELETE
             return {"error": "Error. Error desconocido."}
+
+
+#file = 'requirements.txt'
+#mcli = MoodleClient('https://moodle.cujae.edu.cu/','fialejandrodesp','Adre2909','5')
+#data = asyncio.run(mcli.LoginUpload(file))
+#while mcli.status is None: pass
+#data = mcli.get_store(file)
+#print(data)
