@@ -61,6 +61,7 @@ def get_state(token):
             sf.close()
     except Exception as ex:
         print(str(ex))
+        return {}
         pass
     if token in states:
         return states[token]
